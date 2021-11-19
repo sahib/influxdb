@@ -11,6 +11,7 @@ import (
 
 	"github.com/influxdata/influxdb/v2/kit/platform"
 	"github.com/influxdata/influxdb/v2/pkg/durablequeue"
+	"github.com/influxdata/influxdb/v2/replications/metrics"
 	"go.uber.org/zap"
 )
 
@@ -20,6 +21,7 @@ type replicationQueue struct {
 	done    chan struct{}
 	receive chan struct{}
 	logger  *zap.Logger
+	metrics *metrics.ReplicationsMetrics
 }
 
 type durableQueueManager struct {
@@ -27,14 +29,15 @@ type durableQueueManager struct {
 	logger            *zap.Logger
 	queuePath         string
 	mutex             sync.RWMutex
+	metrics           *metrics.ReplicationsMetrics
 }
 
 var errStartup = errors.New("startup tasks for replications durable queue management failed, see server logs for details")
 var errShutdown = errors.New("shutdown tasks for replications durable queues failed, see server logs for details")
 
 // NewDurableQueueManager creates a new durableQueueManager struct, for managing durable queues associated with
-//replication streams.
-func NewDurableQueueManager(log *zap.Logger, queuePath string) *durableQueueManager {
+// replication streams.
+func NewDurableQueueManager(log *zap.Logger, queuePath string, metrics *metrics.ReplicationsMetrics) *durableQueueManager {
 	replicationQueues := make(map[platform.ID]*replicationQueue)
 
 	os.MkdirAll(queuePath, 0777)
@@ -345,7 +348,7 @@ func (qm *durableQueueManager) CloseAll() error {
 }
 
 // EnqueueData persists a set of bytes to a replication's durable queue.
-func (qm *durableQueueManager) EnqueueData(replicationID platform.ID, data []byte) error {
+func (qm *durableQueueManager) EnqueueData(replicationID platform.ID, data []byte, numPoints int) error {
 	qm.mutex.RLock()
 	defer qm.mutex.RUnlock()
 
@@ -356,6 +359,10 @@ func (qm *durableQueueManager) EnqueueData(replicationID platform.ID, data []byt
 	if err := qm.replicationQueues[replicationID].queue.Append(data); err != nil {
 		return err
 	}
+
+	qm.metrics.PointsQueued.WithLabelValues(replicationID.String()).Add(float64(numPoints))
+	qm.metrics.BytesQueued.WithLabelValues(replicationID.String()).Add(float64(len(data)))
+
 	qm.replicationQueues[replicationID].receive <- struct{}{}
 
 	return nil

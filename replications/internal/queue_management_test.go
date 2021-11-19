@@ -43,7 +43,7 @@ func TestEnqueueScanLog(t *testing.T) {
 	observedZapCore, observedLogs := observer.New(zap.InfoLevel)
 	observedLogger := zap.New(observedZapCore)
 
-	qm := NewDurableQueueManager(observedLogger, queuePath)
+	qm := NewDurableQueueManager(observedLogger, queuePath, nil)
 	defer os.RemoveAll(filepath.Dir(queuePath))
 
 	// Create new queue
@@ -77,7 +77,7 @@ func TestEnqueueScanLogMultiple(t *testing.T) {
 	observedZapCore, observedLogs := observer.New(zap.InfoLevel)
 	observedLogger := zap.New(observedZapCore)
 
-	qm := NewDurableQueueManager(observedLogger, queuePath)
+	qm := NewDurableQueueManager(observedLogger, queuePath, nil)
 	defer os.RemoveAll(filepath.Dir(queuePath))
 
 	// Create new queue
@@ -310,7 +310,7 @@ func initQueueManager(t *testing.T) (string, *durableQueueManager) {
 	queuePath := filepath.Join(enginePath, "replicationq")
 
 	logger := zaptest.NewLogger(t)
-	qm := NewDurableQueueManager(logger, queuePath)
+	qm := NewDurableQueueManager(logger, queuePath, nil)
 
 	return queuePath, qm
 }
@@ -335,7 +335,7 @@ func TestEnqueueData(t *testing.T) {
 	defer os.RemoveAll(queuePath)
 
 	logger := zaptest.NewLogger(t)
-	qm := NewDurableQueueManager(logger, queuePath)
+	qm := NewDurableQueueManager(logger, queuePath, nil)
 
 	require.NoError(t, qm.InitializeQueue(id1, maxQueueSizeBytes))
 	require.DirExists(t, filepath.Join(queuePath, id1.String()))
